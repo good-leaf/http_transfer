@@ -13,4 +13,4 @@
 
 -define(OPTION, [{response_format, binary},
     {max_sessions, 10}, {max_pipeline_size, 100}  ]).
--define(TIMEOUT, 3000).
+-define(TIMEOUT, 10000).
