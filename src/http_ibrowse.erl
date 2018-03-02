@@ -25,5 +25,18 @@ ibrowse_send(Method, Url, Headers, Body, Options, Timeout) ->
         {error, Error} ->
             lager:error("ibrowse_send url:~p, head:~p, reqbody:~p, error:~p",
                 [Url, Headers, Body, Error]),
-            {500, Error}
+            {500, to_binary(Error)}
+    end.
+
+
+to_binary(X) when is_integer(X) -> integer_to_binary(X);
+to_binary(X) when is_binary(X) -> X;
+to_binary(X) when is_float(X) -> float_to_binary(X);
+to_binary(X) when is_atom(X) -> atom_to_binary(X, utf8);
+to_binary(X) when is_list(X) ->
+    case io_lib:printable_list(X) of
+        true ->
+            list_to_binary(X);
+        false ->
+            jsx:encode(X)
     end.

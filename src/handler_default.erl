@@ -54,7 +54,7 @@ parse_handle(<<"PUT">>, Path, Req) ->
     {Headers, Req2} = cowboy_req:headers(Req1),
     lager:info("put:post, body:~p, req:~p", [Body, Req]),
     {ok, Url} = get_env_host(Path),
-    {Code, Res} = http_ibrowse:ibrowse_send(post, Url, Headers, Body, ?OPTION, ?TIMEOUT),
+    {Code, Res} = http_ibrowse:ibrowse_send(put, Url, Headers, Body, ?OPTION, ?TIMEOUT),
     cowboy_req:reply(Code, [], Res, Req2);
 parse_handle(<<"DELETE">>, Path, Req) ->
     {Qs, Req1} = cowboy_req:qs(Req),
