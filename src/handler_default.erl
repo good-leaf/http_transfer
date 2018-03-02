@@ -20,33 +20,50 @@ init(_Transport, Req, []) ->
 handle(Req, State) ->
     {Method, Req1} = cowboy_req:method(Req),
     {Path, Req2} = cowboy_req:path(Req1),
-    {ok, Req3} = parse_handle(Method, Path, Req2),
-    {ok, Req3, State}.
+    Req3 = cross_domain(Req2),
+    {ok, Req4} = parse_handle(Method, Path, Req3),
+    {ok, Req4, State}.
 
 parse_handle(_Method, <<"/favicon.ico">>, Req) ->
     lager:error("unsupport path, req:~p", [Req]),
     cowboy_req:reply(404, Req);
+parse_handle(<<"OPTIONS">>, _Path, Req) ->
+    cowboy_req:reply(200, [
+        {<<"Access-Control-Allow-Origin">>, <<"*">>},
+        {<<"Access-Control-Allow-Headers">>,
+            <<"Content-Type, X-Requested-With, Authorization, Date">>},
+        {<<"Access-Control-Allow-Methods">>, <<"GET,POST,PUT,DELETE,OPTIONS">>}
+    ], <<>>, Req);
 parse_handle(<<"GET">>, Path, Req) ->
     {Qs, Req1} = cowboy_req:qs(Req),
+    {Headers, Req2} = cowboy_req:headers(Req1),
     lager:info("method:get, qs:~p, req:~p", [Qs, Req]),
     {ok, NewPath} = get_env_host(Path),
     Url = NewPath ++ "?" ++ binary_to_list(Qs),
-    {Code, Res} = http_ibrowse:ibrowse_send(get, Url, [], [], ?OPTION, ?TIMEOUT),
-    cowboy_req:reply(Code, [], Res, Req1);
+    {Code, Res} = http_ibrowse:ibrowse_send(get, Url, Headers, [], ?OPTION, ?TIMEOUT),
+    cowboy_req:reply(Code, [], Res, Req2);
 parse_handle(<<"POST">>, Path, Req) ->
     {ok, Body, Req1} = cowboy_req:body(Req),
+    {Headers, Req2} = cowboy_req:headers(Req1),
     lager:info("method:post, body:~p, req:~p", [Body, Req]),
     {ok, Url} = get_env_host(Path),
-    {Code, Res} = http_ibrowse:ibrowse_send(post, Url, [{<<"content-type">>, <<"application/json">>}],
-        Body, ?OPTION, ?TIMEOUT),
-    cowboy_req:reply(Code, [], Res, Req1);
+    {Code, Res} = http_ibrowse:ibrowse_send(post, Url, Headers, Body, ?OPTION, ?TIMEOUT),
+    cowboy_req:reply(Code, [], Res, Req2);
+parse_handle(<<"PUT">>, Path, Req) ->
+    {ok, Body, Req1} = cowboy_req:body(Req),
+    {Headers, Req2} = cowboy_req:headers(Req1),
+    lager:info("put:post, body:~p, req:~p", [Body, Req]),
+    {ok, Url} = get_env_host(Path),
+    {Code, Res} = http_ibrowse:ibrowse_send(post, Url, Headers, Body, ?OPTION, ?TIMEOUT),
+    cowboy_req:reply(Code, [], Res, Req2);
 parse_handle(<<"DELETE">>, Path, Req) ->
     {Qs, Req1} = cowboy_req:qs(Req),
+    {Headers, Req2} = cowboy_req:headers(Req1),
     lager:info("method:delete, qs:~p, req:~p", [Qs, Req]),
     {ok, NewPath} = get_env_host(Path),
     Url = NewPath ++ "?" ++ binary_to_list(Qs),
-    {Code, Res} = http_ibrowse:ibrowse_send(delete, Url, [], [], ?OPTION, ?TIMEOUT),
-    cowboy_req:reply(Code, [], Res, Req1);
+    {Code, Res} = http_ibrowse:ibrowse_send(delete, Url, Headers, [], ?OPTION, ?TIMEOUT),
+    cowboy_req:reply(Code, [], Res, Req2);
 parse_handle(Method, _Path, Req) ->
     lager:error("unsupport method:~p, req:~p", [Method, Req]),
     cowboy_req:reply(405, Req).
@@ -65,3 +82,7 @@ get_env_host(Path) ->
         Domain ->
             {ok, Domain ++ binary_to_list(NewPath)}
     end.
+
+%%跨域初始化
+cross_domain(Req) ->
+    cowboy_req:set_resp_header(<<"Access-Control-Allow-Origin">>, <<"*">>, Req).
