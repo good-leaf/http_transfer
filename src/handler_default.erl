@@ -40,7 +40,7 @@ parse_handle(<<"GET">>, Path, Req) ->
     lager:info("method:get, qs:~p, req:~p", [Qs, Req]),
     {ok, NewPath} = get_env_host(Path),
     Url = NewPath ++ "?" ++ binary_to_list(Qs),
-    {Code, Res} = http_ibrowse:ibrowse_send(get, Url, Headers, [], ?OPTION, ?TIMEOUT),
+    {Code, Res} = http_ibrowse:ibrowse_send(get, Url, [{<<"content-type">>, <<"application/json">>}], [], ?OPTION, ?TIMEOUT),
     cowboy_req:reply(Code, [], Res, Req2);
 parse_handle(<<"POST">>, Path, Req) ->
     {ok, Body, Req1} = cowboy_req:body(Req),
