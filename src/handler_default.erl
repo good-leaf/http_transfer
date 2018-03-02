@@ -37,32 +37,32 @@ parse_handle(<<"OPTIONS">>, _Path, Req) ->
 parse_handle(<<"GET">>, Path, Req) ->
     {Qs, Req1} = cowboy_req:qs(Req),
     {Headers, Req2} = cowboy_req:headers(Req1),
+    {Url, NewHeaders} = get_url_headers(Path, Headers),
     lager:info("method:get, qs:~p, req:~p", [Qs, Req]),
-    {ok, NewPath} = get_env_host(Path),
-    Url = NewPath ++ "?" ++ binary_to_list(Qs),
-    {Code, Res} = http_ibrowse:ibrowse_send(get, Url, [{<<"content-type">>, <<"application/json">>}], [], ?OPTION, ?TIMEOUT),
+    NewUrl = Url ++ "?" ++ binary_to_list(Qs),
+    {Code, Res} = http_ibrowse:ibrowse_send(get, NewUrl, NewHeaders, [], ?OPTION, ?TIMEOUT),
     cowboy_req:reply(Code, [], Res, Req2);
 parse_handle(<<"POST">>, Path, Req) ->
     {ok, Body, Req1} = cowboy_req:body(Req),
     {Headers, Req2} = cowboy_req:headers(Req1),
+    {Url, NewHeaders} = get_url_headers(Path, Headers),
     lager:info("method:post, body:~p, req:~p", [Body, Req]),
-    {ok, Url} = get_env_host(Path),
-    {Code, Res} = http_ibrowse:ibrowse_send(post, Url, Headers, Body, ?OPTION, ?TIMEOUT),
+    {Code, Res} = http_ibrowse:ibrowse_send(post, Url, NewHeaders, Body, ?OPTION, ?TIMEOUT),
     cowboy_req:reply(Code, [], Res, Req2);
 parse_handle(<<"PUT">>, Path, Req) ->
     {ok, Body, Req1} = cowboy_req:body(Req),
     {Headers, Req2} = cowboy_req:headers(Req1),
+    {Url, NewHeaders} = get_url_headers(Path, Headers),
     lager:info("put:post, body:~p, req:~p", [Body, Req]),
-    {ok, Url} = get_env_host(Path),
-    {Code, Res} = http_ibrowse:ibrowse_send(put, Url, Headers, Body, ?OPTION, ?TIMEOUT),
+    {Code, Res} = http_ibrowse:ibrowse_send(put, Url, NewHeaders, Body, ?OPTION, ?TIMEOUT),
     cowboy_req:reply(Code, [], Res, Req2);
 parse_handle(<<"DELETE">>, Path, Req) ->
     {Qs, Req1} = cowboy_req:qs(Req),
     {Headers, Req2} = cowboy_req:headers(Req1),
+    {Url, NewHeaders} = get_url_headers(Path, Headers),
     lager:info("method:delete, qs:~p, req:~p", [Qs, Req]),
-    {ok, NewPath} = get_env_host(Path),
-    Url = NewPath ++ "?" ++ binary_to_list(Qs),
-    {Code, Res} = http_ibrowse:ibrowse_send(delete, Url, Headers, [], ?OPTION, ?TIMEOUT),
+    NewUrl = Url ++ "?" ++ binary_to_list(Qs),
+    {Code, Res} = http_ibrowse:ibrowse_send(delete, NewUrl, NewHeaders, [], ?OPTION, ?TIMEOUT),
     cowboy_req:reply(Code, [], Res, Req2);
 parse_handle(Method, _Path, Req) ->
     lager:error("unsupport method:~p, req:~p", [Method, Req]),
@@ -71,18 +71,30 @@ parse_handle(Method, _Path, Req) ->
 terminate(_Reason, _Req, _State) ->
     ok.
 
-get_env_host(Path) ->
+parse_path(Path) ->
     [<<>>, PName | Other] = binary:split(Path, <<"/">>, [global]),
-    NewPath = lists:foldl(fun(N, <<>>) -> <<"/", N/binary>>;
+    RealPath = lists:foldl(fun(N, <<>>) -> <<"/", N/binary>>;
         (N, Bin) -> <<Bin/binary, "/", N/binary>> end, <<>>, Other),
+    {PName, RealPath}.
+
+get_env_host(PName) ->
     {ok, Hosts} = application:get_env(?APPNAME, hosts),
     case proplists:get_value(PName, Hosts) of
         undefined ->
             {error, empty};
         Domain ->
-            {ok, Domain ++ binary_to_list(NewPath)}
+            {ok, Domain}
     end.
 
 %%跨域初始化
 cross_domain(Req) ->
     cowboy_req:set_resp_header(<<"Access-Control-Allow-Origin">>, <<"*">>, Req).
+
+set_headers(Headers, Domain) ->
+    %替换host
+    lists:keydelete(<<"host">>, 1, Headers) ++ [{<<"host">>, Domain}].
+
+get_url_headers(Path, Headers) ->
+    {PName, RealPath} = parse_path(Path),
+    {ok, Domain} = get_env_host(PName),
+    {Domain ++ binary_to_list(RealPath), set_headers(Headers, Domain)}.
