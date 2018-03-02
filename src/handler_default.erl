@@ -92,7 +92,8 @@ cross_domain(Req) ->
 
 set_headers(Headers, Domain) ->
     %替换host
-    lists:keydelete(<<"host">>, 1, Headers) ++ [{<<"host">>, Domain}].
+    <<"http://", Host/binary>> = list_to_binary(Domain),
+    lists:keydelete(<<"host">>, 1, Headers) ++ [{<<"host">>, Host}].
 
 get_url_headers(Path, Headers) ->
     {PName, RealPath} = parse_path(Path),
